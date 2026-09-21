@@ -1,0 +1,8 @@
+ems.db
+*.db
+*.sqlite
+__pycache__
+.venv
+venv
+.env
+instance
