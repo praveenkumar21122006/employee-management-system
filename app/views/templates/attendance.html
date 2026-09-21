@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance — EMS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); body{font-family:'Inter',sans-serif} .toast{animation:slideIn .3s ease}@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}</style>
+</head>
+<body class="bg-[#f8fafc] min-h-screen text-slate-800">
+  <!-- Header -->
+  <header class="bg-white border-b sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-white"><i class="fa-solid fa-users"></i></div>
+        <div>
+          <h1 class="font-bold text-lg leading-none">Employee Management</h1>
+          <p class="text-xs text-slate-500">Attendance System • Timing • Dept • Role</p>
+        </div>
+        <nav class="hidden md:flex ml-6 gap-1 bg-slate-100 p-1 rounded-lg">
+          <a href="/" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:bg-white">Dashboard</a>
+          <a href="/attendance" class="px-3 py-1.5 rounded-md text-xs font-medium bg-white shadow-sm border">Attendance</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="userBadge" class="hidden text-xs px-3 py-1.5 rounded-full border font-medium"></span>
+        <span id="clock" class="hidden md:inline text-xs font-mono bg-slate-900 text-white px-3 py-1.5 rounded-full"></span>
+        <button onclick="openProfile()" class="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center"><i class="fa-solid fa-user text-xs"></i></button>
+        <button onclick="logout()" class="px-3 py-2 text-xs font-medium text-slate-500 hover:text-red-600"><i class="fa-solid fa-right-from-bracket"></i></button>
+      </div>
+    </div>
+    <div id="roleBanner" class="hidden px-6 py-2 text-xs font-medium border-t"></div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Action Bar -->
+    <div class="bg-white rounded-xl border p-5 mb-6">
+      <div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        <div>
+          <h2 class="font-semibold">Mark Attendance</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Timing is auto-captured. Admin can mark for any employee & any date.</p>
+          <div id="todayInfo" class="mt-2 text-xs bg-slate-50 border rounded-lg px-3 py-2 inline-flex gap-3">
+            <span><i class="fa-regular fa-calendar mr-1"></i> <span id="todayDate">--</span></span>
+            <span class="text-slate-300">|</span>
+            <span id="myStatus" class="font-medium">Loading...</span>
+          </div>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+          <!-- Admin employee selector -->
+          <select id="empSelect" class="hidden px-3 py-2.5 border rounded-lg text-sm bg-white min-w-[200px]">
+            <option value="">-- Select Employee (Admin) --</option>
+          </select>
+          <input id="attDate" type="date" class="px-3 py-2.5 border rounded-lg text-sm">
+          <div class="flex gap-2">
+            <button onclick="doCheckIn()" id="btnIn" class="flex-1 lg:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-right-to-bracket"></i> Check In</button>
+            <button onclick="doCheckOut()" id="btnOut" class="flex-1 lg:flex-none px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-right-from-bracket"></i> Check Out</button>
+          </div>
+        </div>
+      </div>
+      <!-- Admin quick add absent -->
+      <div id="adminQuick" class="hidden mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-5 gap-2">
+        <select id="quickEmp" class="px-3 py-2 border rounded-lg text-sm bg-white"><option value="">Employee *</option></select>
+        <input id="quickDate" type="date" class="px-3 py-2 border rounded-lg text-sm">
+        <select id="quickStatus" class="px-3 py-2 border rounded-lg text-sm bg-white"><option value="Present">Present</option><option value="Absent">Absent</option><option value="Late">Late</option><option value="On Leave">On Leave</option></select>
+        <input id="quickIn" type="time" class="px-3 py-2 border rounded-lg text-sm" placeholder="09:00">
+        <button onclick="quickAdd()" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800">Add Record</button>
+      </div>
+      <p id="adminQuickHint" class="hidden text-[11px] text-slate-400 mt-2">Admin: You can add absent/leave records or correct timing via quick add. Timing auto-calculates hours.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+      <div class="bg-white rounded-xl p-4 border"><p class="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Today Present</p><p id="statPresent" class="text-2xl font-bold">—</p></div>
+      <div class="bg-white rounded-xl p-4 border"><p class="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Late</p><p id="statLate" class="text-2xl font-bold text-amber-600">—</p></div>
+      <div class="bg-white rounded-xl p-4 border"><p class="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Absent</p><p id="statAbsent" class="text-2xl font-bold text-red-600">—</p></div>
+      <div class="bg-white rounded-xl p-4 border"><p class="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Avg Hours</p><p id="statHours" class="text-2xl font-bold">—</p></div>
+      <div class="bg-white rounded-xl p-4 border"><p class="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Total Records</p><p id="statTotal" class="text-2xl font-bold">—</p></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border p-4 mb-6 flex flex-col lg:flex-row gap-3">
+      <input id="search" oninput="debounced()" placeholder="Search name or email..." class="flex-1 px-3 py-2.5 border rounded-lg text-sm">
+      <select id="deptFilter" onchange="fetchAttendance()" class="px-3 py-2.5 border rounded-lg text-sm bg-white min-w-[160px]"><option value="">All Departments</option></select>
+      <select id="statusFilter" onchange="fetchAttendance()" class="px-3 py-2.5 border rounded-lg text-sm bg-white"><option value="">All Status</option><option value="Present">Present</option><option value="Late">Late</option><option value="Absent">Absent</option><option value="On Leave">On Leave</option></select>
+      <input id="filterDate" type="date" onchange="fetchAttendance()" class="px-3 py-2.5 border rounded-lg text-sm">
+      <div class="flex gap-1">
+        <input id="fromDate" type="date" onchange="fetchAttendance()" class="px-3 py-2.5 border rounded-lg text-sm" title="From">
+        <input id="toDate" type="date" onchange="fetchAttendance()" class="px-3 py-2.5 border rounded-lg text-sm" title="To">
+      </div>
+      <button onclick="fetchAttendance()" class="px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm"><i class="fa-solid fa-rotate"></i></button>
+      <button onclick="clearFilters()" class="px-3 py-2.5 border rounded-lg text-sm bg-white">Clear</button>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 border-b text-[11px] uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="text-left px-4 py-3 font-semibold">Date</th>
+              <th class="text-left px-4 py-3 font-semibold">Employee (Name)</th>
+              <th class="text-left px-4 py-3 font-semibold">Department</th>
+              <th class="text-left px-4 py-3 font-semibold">Role</th>
+              <th class="text-left px-4 py-3 font-semibold">Timing</th>
+              <th class="text-left px-4 py-3 font-semibold">Hours</th>
+              <th class="text-left px-4 py-3 font-semibold">Status</th>
+              <th class="text-right px-4 py-3 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="attTable" class="divide-y"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="hidden text-center py-16"><i class="fa-solid fa-clipboard-user text-4xl text-slate-300 mb-3"></i><p class="text-slate-500 text-sm">No attendance records.</p><p class="text-xs text-slate-400 mt-1">Check in to create your first record.</p></div>
+    </div>
+  </main>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="hidden fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+      <div class="px-6 py-4 border-b flex justify-between items-center"><h3 class="font-semibold">Edit Attendance</h3><button onclick="closeEdit()" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button></div>
+      <form id="editForm" onsubmit="handleEdit(event)" class="p-6 grid grid-cols-2 gap-3">
+        <input type="hidden" id="editId">
+        <div class="col-span-2"><label class="text-xs font-semibold uppercase text-slate-600">Date</label><input id="eDate" type="date" class="mt-1 w-full px-3 py-2 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold uppercase text-slate-600">Check In (HH:MM)</label><input id="eIn" type="time" class="mt-1 w-full px-3 py-2 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold uppercase text-slate-600">Check Out (HH:MM)</label><input id="eOut" type="time" class="mt-1 w-full px-3 py-2 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold uppercase text-slate-600">Status</label><select id="eStatus" class="mt-1 w-full px-3 py-2 border rounded-lg text-sm bg-white"><option>Present</option><option>Late</option><option>Absent</option><option>On Leave</option></select></div>
+        <div><label class="text-xs font-semibold uppercase text-slate-600">Notes</label><input id="eNotes" placeholder="Optional" class="mt-1 w-full px-3 py-2 border rounded-lg text-sm"></div>
+        <div class="col-span-2 flex justify-end gap-2 pt-2"><button type="button" onclick="closeEdit()" class="px-4 py-2 border rounded-lg text-sm">Cancel</button><button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm">Save</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<script>
+let currentUser=null;
+let allRecords=[];
+
+function toast(m,t='success'){
+  const c=document.getElementById('toastContainer');
+  const el=document.createElement('div');
+  el.className=`toast px-4 py-3 rounded-lg text-sm font-medium shadow-lg border ${t==='error'?'bg-red-50 border-red-200 text-red-700':'bg-emerald-50 border-emerald-200 text-emerald-700'}`;
+  el.textContent=m; c.appendChild(el); setTimeout(()=>el.remove(),3000);
+}
+function updateClock(){
+  const now=new Date();
+  document.getElementById('clock').textContent=now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('todayDate').textContent=now.toLocaleDateString([], {weekday:'short', year:'numeric', month:'short', day:'numeric'});
+}
+setInterval(updateClock,1000); updateClock();
+document.getElementById('attDate').valueAsDate=new Date();
+document.getElementById('filterDate').value='';
+document.getElementById('quickDate').valueAsDate=new Date();
+
+async function fetchMe(){
+  const r=await fetch('/auth/me',{credentials:'same-origin'});
+  if(!r.ok) location.href='/login';
+  const j=await r.json(); currentUser=j.employee;
+  const b=document.getElementById('userBadge');
+  b.textContent=currentUser.full_name+' • '+currentUser.role;
+  b.className='text-xs px-3 py-1.5 rounded-full border font-medium '+(currentUser.role==='Admin'?'bg-violet-50 border-violet-200 text-violet-700':'bg-emerald-50 border-emerald-200 text-emerald-700');
+  b.classList.remove('hidden');
+  const banner=document.getElementById('roleBanner');
+  if(currentUser.role==='Admin'){
+    banner.textContent='Admin: view all attendance, mark for any employee, edit/delete any record. Timing shown for all.';
+    banner.className='px-6 py-2 text-xs font-medium border-t bg-violet-50 text-violet-700';
+    document.getElementById('empSelect').classList.remove('hidden');
+    document.getElementById('adminQuick').classList.remove('hidden');
+    document.getElementById('adminQuickHint').classList.remove('hidden');
+  } else {
+    banner.textContent='Employee: check-in/out for yourself today only. You see only your records (name/dept/role auto-filled).';
+    banner.className='px-6 py-2 text-xs font-medium border-t bg-amber-50 text-amber-700';
+  }
+  banner.classList.remove('hidden');
+  // populate employee selects for admin
+  if(currentUser.role==='Admin'){
+    const res=await fetch('/employees',{credentials:'same-origin'});
+    if(res.ok){
+      const d=await res.json();
+      const sel=document.getElementById('empSelect'), qsel=document.getElementById('quickEmp');
+      sel.innerHTML='<option value="">-- Select Employee (Admin) --</option>';
+      qsel.innerHTML='<option value="">Employee *</option>';
+      d.employees.forEach(e=>{
+        const o=document.createElement('option'); o.value=e.id; o.textContent=`${e.full_name} (${e.department_name||'No Dept'} • ${e.role})`;
+        const o2=o.cloneNode(true);
+        sel.appendChild(o); qsel.appendChild(o2);
+      });
+    }
+    // dept filter
+    const dr=await fetch('/departments',{credentials:'same-origin'});
+    if(dr.ok){
+      const dj=await dr.json();
+      const df=document.getElementById('deptFilter');
+      dj.departments.forEach(dep=>{
+        const o=document.createElement('option'); o.value=dep.department_name; o.textContent=dep.department_name;
+        df.appendChild(o);
+      });
+    }
+  } else {
+    // employee still needs dept filter but without admin employee list
+    const dr=await fetch('/departments',{credentials:'same-origin'});
+    if(dr.ok){
+      const dj=await dr.json();
+      const df=document.getElementById('deptFilter');
+      dj.departments.forEach(dep=>{
+        const o=document.createElement('option'); o.value=dep.department_name; o.textContent=dep.department_name;
+        df.appendChild(o);
+      });
+    }
+  }
+}
+
+async function fetchAttendance(){
+  const params=new URLSearchParams();
+  const d=document.getElementById('filterDate').value;
+  const from=document.getElementById('fromDate').value;
+  const to=document.getElementById('toDate').value;
+  const dept=document.getElementById('deptFilter').value;
+  const status=document.getElementById('statusFilter').value;
+  const search=document.getElementById('search').value.trim();
+  if(d) params.set('date',d);
+  if(from) params.set('from',from);
+  if(to) params.set('to',to);
+  if(dept) params.set('department',dept);
+  if(status) params.set('status',status);
+  if(search) params.set('search',search);
+  const r=await fetch('/api/attendance?'+params.toString(),{credentials:'same-origin'});
+  if(!r.ok){
+    const j=await r.json().catch(()=>({error:'Failed'}));
+    toast(j.error||'Failed to load','error');
+    if(r.status===401) location.href='/login';
+    return;
+  }
+  const j=await r.json();
+  allRecords=j.attendance||[];
+  renderTable(allRecords);
+  updateStats(allRecords);
+  updateMyStatus(allRecords);
+}
+
+function updateMyStatus(records){
+  const today=new Date().toISOString().slice(0,10);
+  const mine=records.find(r=> r.employee_id===currentUser.id && r.date===today);
+  const el=document.getElementById('myStatus');
+  if(!mine){ el.textContent='Not checked in today'; el.className='font-medium text-slate-500'; }
+  else if(mine.check_in && !mine.check_out){ el.textContent=`Checked in at ${mine.check_in_time} • ${mine.status}`; el.className='font-medium text-emerald-700'; }
+  else if(mine.check_in && mine.check_out){ el.textContent=`Completed ${mine.timing} • ${mine.status}`; el.className='font-medium text-slate-700'; }
+  else el.textContent=mine.status;
+}
+
+function updateStats(records){
+  const today=new Date().toISOString().slice(0,10);
+  const todays=records.filter(r=> r.date===today);
+  document.getElementById('statPresent').textContent=todays.filter(r=> r.status==='Present').length;
+  document.getElementById('statLate').textContent=todays.filter(r=> r.status==='Late').length;
+  document.getElementById('statAbsent').textContent=todays.filter(r=> r.status==='Absent').length;
+  const withHours=records.filter(r=> r.hours!=null);
+  const avg=withHours.length? (withHours.reduce((s,r)=>s+r.hours,0)/withHours.length).toFixed(1)+'h' : '—';
+  document.getElementById('statHours').textContent=avg;
+  document.getElementById('statTotal').textContent=records.length;
+}
+
+function renderTable(records){
+  const tb=document.getElementById('attTable'), empty=document.getElementById('empty');
+  tb.innerHTML='';
+  if(!records.length){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  const isAdmin=currentUser.role==='Admin';
+  records.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.className='hover:bg-slate-50 '+(r.employee_id===currentUser.id?'bg-indigo-50/30':'');
+    const statusColor = r.status==='Present'?'bg-emerald-100 text-emerald-700': r.status==='Late'?'bg-amber-100 text-amber-700': r.status==='Absent'?'bg-red-100 text-red-700':'bg-slate-100 text-slate-600';
+    tr.innerHTML=`
+      <td class="px-4 py-3 font-mono text-xs">${r.date}</td>
+      <td class="px-4 py-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">${r.first_name[0]}${r.last_name[0]}</div>
+          <div>
+            <p class="font-medium text-xs leading-none">${r.employee_name} ${r.employee_id===currentUser.id?'<span class="ml-1 px-1 py-0.5 bg-indigo-600 text-white rounded text-[9px]">YOU</span>':''}</p>
+            <p class="text-[11px] text-slate-500">${r.email||''}</p>
+          </div>
+        </div>
+      </td>
+      <td class="px-4 py-3"><span class="px-2 py-1 bg-slate-100 rounded-full text-xs">${r.department_name||'—'}</span></td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ${r.role==='Admin'?'bg-violet-100 text-violet-700':'bg-emerald-100 text-emerald-700'}">${r.role||'—'}</span></td>
+      <td class="px-4 py-3">
+        <div class="text-xs">
+          <div class="font-mono">${r.check_in_time||'--'} <span class="text-slate-400">→</span> ${r.check_out_time||'--'}</div>
+          <div class="text-[11px] text-slate-500">${r.timing}</div>
+        </div>
+      </td>
+      <td class="px-4 py-3 font-medium text-xs">${r.hours!=null? r.hours+'h':'—'}</td>
+      <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-medium ${statusColor}">${r.status}</span></td>
+      <td class="px-4 py-3">
+        <div class="flex justify-end gap-1">
+          ${(isAdmin || r.employee_id===currentUser.id) ? `<button onclick="openEdit(${r.id})" class="px-2 py-1 rounded-lg bg-white border text-xs hover:bg-slate-50"><i class="fa-solid fa-pen text-[10px]"></i> Edit</button>`:''}
+          ${isAdmin ? `<button onclick="del(${r.id})" class="px-2 py-1 rounded-lg bg-white border text-xs hover:bg-red-50 hover:text-red-600"><i class="fa-solid fa-trash text-[10px]"></i></button>`:''}
+        </div>
+      </td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+async function doCheckIn(){
+  const empSel=document.getElementById('empSelect').value;
+  const d=document.getElementById('attDate').value;
+  const payload={};
+  if(empSel) payload.employee_id=parseInt(empSel);
+  if(d) payload.date=d;
+  const r=await fetch('/api/attendance/check-in',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)});
+  const j=await r.json();
+  if(!r.ok){ toast(j.error||'Check-in failed','error'); return; }
+  toast(j.message||'Checked in'); fetchAttendance();
+}
+async function doCheckOut(){
+  const empSel=document.getElementById('empSelect').value;
+  const d=document.getElementById('attDate').value;
+  const payload={};
+  if(empSel) payload.employee_id=parseInt(empSel);
+  if(d) payload.date=d;
+  const r=await fetch('/api/attendance/check-out',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)});
+  const j=await r.json();
+  if(!r.ok){ toast(j.error||'Check-out failed','error'); return; }
+  toast(j.message||'Checked out'); fetchAttendance();
+}
+async function quickAdd(){
+  const emp=document.getElementById('quickEmp').value;
+  const d=document.getElementById('quickDate').value;
+  const status=document.getElementById('quickStatus').value;
+  const tin=document.getElementById('quickIn').value;
+  if(!emp){ toast('Select employee','error'); return; }
+  if(!d){ toast('Select date','error'); return; }
+  const payload={employee_id:parseInt(emp), date:d, status};
+  if(tin) payload.check_in=tin;
+  // For absent, no check_in needed; for present, need check_in
+  const r=await fetch('/api/attendance/check-in',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)});
+  const j=await r.json();
+  if(!r.ok && !j.attendance){ toast(j.error||'Failed','error'); return; }
+  if(status==='Absent'){
+    // Already created as absent if check_in not provided? Our check-in creates Present/Late by default, so we need to update status via PUT
+    if(j.attendance){
+      const id=j.attendance.id;
+      // update to Absent and clear check_in if needed
+      await fetch('/api/attendance/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({status:'Absent', check_in:'', check_out:''})});
+    }
+  }
+  toast('Record added'); fetchAttendance();
+}
+let editId=null;
+function openEdit(id){
+  const r=allRecords.find(x=>x.id===id);
+  if(!r) return;
+  editId=id;
+  document.getElementById('editId').value=id;
+  document.getElementById('eDate').value=r.date;
+  document.getElementById('eIn').value=r.check_in_time? r.check_in_time.slice(0,5):'';
+  document.getElementById('eOut').value=r.check_out_time? r.check_out_time.slice(0,5):'';
+  document.getElementById('eStatus').value=r.status;
+  document.getElementById('eNotes').value=r.notes||'';
+  document.getElementById('editModal').classList.remove('hidden');
+}
+function closeEdit(){ document.getElementById('editModal').classList.add('hidden'); editId=null; }
+async function handleEdit(e){
+  e.preventDefault();
+  const payload={};
+  const d=document.getElementById('eDate').value;
+  const tin=document.getElementById('eIn').value;
+  const tout=document.getElementById('eOut').value;
+  const status=document.getElementById('eStatus').value;
+  const notes=document.getElementById('eNotes').value;
+  if(d) payload.date=d;
+  if(tin) payload.check_in=d+'T'+tin+':00';
+  else if(!tin) payload.check_in='';
+  if(tout) payload.check_out=d+'T'+tout+':00';
+  else payload.check_out='';
+  payload.status=status;
+  payload.notes=notes;
+  // For check_in empty, we send empty to clear? Controller handles clearing only if we send check_in as ''? It currently expects check_in present to update, but we can handle
+  // Instead, send null for clear via special handling: if empty, send check_in with is need to handle
+  const r=await fetch('/api/attendance/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)});
+  const j=await r.json();
+  if(!r.ok){ toast(j.error||'Update failed','error'); return; }
+  toast('Updated'); closeEdit(); fetchAttendance();
+}
+async function del(id){
+  if(!confirm('Delete attendance record?')) return;
+  const r=await fetch('/api/attendance/'+id,{method:'DELETE',credentials:'same-origin'});
+  const j=await r.json();
+  if(!r.ok){ toast(j.error||'Delete failed','error'); return; }
+  toast('Deleted'); fetchAttendance();
+}
+function clearFilters(){
+  document.getElementById('filterDate').value='';
+  document.getElementById('fromDate').value='';
+  document.getElementById('toDate').value='';
+  document.getElementById('deptFilter').value='';
+  document.getElementById('statusFilter').value='';
+  document.getElementById('search').value='';
+  fetchAttendance();
+}
+let debounce;
+function debounced(){ clearTimeout(debounce); debounce=setTimeout(fetchAttendance,300); }
+function logout(){ fetch('/auth/logout',{method:'POST',credentials:'same-origin'}).then(()=> location.href='/login'); }
+function openProfile(){ location.href='/'; }
+
+(async function init(){
+  await fetchMe();
+  await fetchAttendance();
+})();
+</script>
+</body>
+</html>

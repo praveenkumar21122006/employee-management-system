@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMS — Employee Management System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); body{font-family:'Inter',sans-serif} .toast{animation:slideIn .3s ease}@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}</style>
+</head>
+<body class="bg-[#f8fafc] min-h-screen text-slate-800">
+  <!-- Header -->
+  <header class="bg-white border-b sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-white"><i class="fa-solid fa-users"></i></div>
+        <div>
+          <h1 class="font-bold text-lg leading-none">Employee Management</h1>
+          <p class="text-xs text-slate-500">Modular MVC • Flask + SQLite</p>
+        </div>
+        <nav class="hidden md:flex ml-6 gap-1 bg-slate-100 p-1 rounded-lg">
+          <a href="/" class="px-3 py-1.5 rounded-md text-xs font-medium bg-white shadow-sm border">Dashboard</a>
+          <a href="/attendance" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:bg-white">Attendance</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="userBadge" class="hidden text-xs px-3 py-1.5 rounded-full border font-medium"></span>
+        <span id="healthBadge" class="text-xs px-3 py-1 rounded-full bg-slate-100">Checking...</span>
+        <button id="addBtn" onclick="openModal()" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition"><i class="fa-solid fa-plus mr-2"></i>Add Employee</button>
+        <button onclick="openProfile()" class="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center" title="My Profile"><i class="fa-solid fa-user text-xs"></i></button>
+        <button onclick="logout()" class="px-3 py-2 text-xs font-medium text-slate-500 hover:text-red-600 flex items-center gap-1"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+      </div>
+    </div>
+    <!-- Role banner -->
+    <div id="roleBanner" class="hidden px-6 py-2 text-xs font-medium border-t"></div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Total Employees</p><p id="statTotal" class="text-3xl font-bold mt-1">—</p></div>
+      <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Departments</p><p id="statDepts" class="text-3xl font-bold mt-1">—</p></div>
+      <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Avg Salary</p><p id="statAvg" class="text-3xl font-bold mt-1">—</p></div>
+      <div class="bg-white rounded-xl p-5 border"><p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Admins</p><p id="statAdmins" class="text-3xl font-bold mt-1">—</p></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border p-4 mb-6 flex flex-col md:flex-row gap-3 items-center">
+      <div class="relative flex-1 w-full">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+        <input id="searchInput" oninput="debouncedFetch()" placeholder="Search by name or email..." class="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <select id="deptFilter" onchange="fetchEmployees()" class="w-full md:w-56 px-3 py-2.5 border rounded-lg text-sm bg-white"><option value="">All Departments</option></select>
+      <select id="roleFilter" onchange="fetchEmployees()" class="w-full md:w-40 px-3 py-2.5 border rounded-lg text-sm bg-white"><option value="">All Roles</option><option value="Admin">Admin</option><option value="Employee">Employee</option></select>
+      <button onclick="fetchEmployees()" class="px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800"><i class="fa-solid fa-rotate"></i></button>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 border-b text-xs uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="text-left px-5 py-3 font-semibold">Employee</th>
+              <th class="text-left px-5 py-3 font-semibold">Department</th>
+              <th class="text-left px-5 py-3 font-semibold">Role</th>
+              <th class="text-left px-5 py-3 font-semibold" id="salaryHeader">Salary</th>
+              <th class="text-left px-5 py-3 font-semibold">Hire Date</th>
+              <th class="text-right px-5 py-3 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="employeeTable" class="divide-y"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="hidden text-center py-16"><i class="fa-solid fa-inbox text-4xl text-slate-300 mb-3"></i><p class="text-slate-500">No employees found.</p></div>
+    </div>
+
+    <!-- Department quick add - Admin only -->
+    <div id="deptAdminBlock" class="hidden mt-8 bg-white rounded-xl border p-5">
+      <h3 class="font-semibold mb-3"><i class="fa-solid fa-building mr-2 text-slate-400"></i>Departments <span class="text-xs font-normal text-slate-500">(Admin only)</span></h3>
+      <div id="deptList" class="flex flex-wrap gap-2 mb-3"></div>
+      <div class="flex gap-2">
+        <input id="newDeptName" placeholder="New department name" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+        <button onclick="createDepartment()" class="px-4 py-2 bg-white border rounded-lg text-sm font-medium hover:bg-slate-50">Add</button>
+      </div>
+    </div>
+
+    <!-- Employee info card -->
+    <div id="employeeInfo" class="hidden mt-8 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+      <i class="fa-solid fa-circle-info mr-2"></i><span id="employeeInfoText"></span>
+    </div>
+  </main>
+
+  <!-- Add/Edit Modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-auto">
+      <div class="px-6 py-4 border-b flex items-center justify-between sticky top-0 bg-white">
+        <h2 id="modalTitle" class="font-semibold text-lg">Add Employee</h2>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="employeeForm" onsubmit="handleSubmit(event)" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input type="hidden" id="editId">
+        <div><label class="text-xs font-semibold text-slate-600 uppercase">First Name *</label><input id="first_name" required class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold text-slate-600 uppercase">Last Name *</label><input id="last_name" required class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold text-slate-600 uppercase">Email *</label><input id="email" type="email" required class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold text-slate-600 uppercase">Phone</label><input id="phone" placeholder="+1 555-0100" class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold text-slate-600 uppercase">Department</label><select id="department_id" class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm bg-white"></select></div>
+        <div id="roleField"><label class="text-xs font-semibold text-slate-600 uppercase">Role *</label><select id="role" required class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm bg-white"><option value="Employee">Employee</option><option value="Admin">Admin</option></select></div>
+        <div id="salaryField"><label class="text-xs font-semibold text-slate-600 uppercase">Salary *</label><input id="salary" type="number" min="0" step="0.01" required class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div><label class="text-xs font-semibold text-slate-600 uppercase">Hire Date</label><input id="hire_date" type="date" class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div id="passwordField"><label class="text-xs font-semibold text-slate-600 uppercase">Password <span id="passwordHint" class="normal-case font-normal text-slate-400">(leave blank to keep)</span></label><input id="password" type="password" placeholder="••••••••" class="mt-1 w-full px-3 py-2.5 border rounded-lg text-sm"></div>
+        <div class="md:col-span-2 flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-lg border text-sm font-medium hover:bg-slate-50">Cancel</button>
+          <button type="submit" class="px-6 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profileModal" class="hidden fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+      <div class="px-6 py-4 border-b flex items-center justify-between"><h2 class="font-semibold">My Profile</h2><button onclick="closeProfile()" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button></div>
+      <div id="profileContent" class="p-6 space-y-3 text-sm"></div>
+      <div class="px-6 pb-6 space-y-3">
+        <div class="flex justify-between"><button onclick="openEdit(currentUser.id); closeProfile()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm"><i class="fa-solid fa-pen mr-2"></i>Edit My Profile</button><button onclick="closeProfile()" class="px-4 py-2 border rounded-lg text-sm">Close</button></div>
+        <div class="pt-3 border-t">
+          <button onclick="confirmDelete(currentUser.id); closeProfile()" class="w-full px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 flex items-center justify-center gap-2"><i class="fa-solid fa-trash"></i> Remove My Account</button>
+          <p class="text-[11px] text-slate-400 text-center mt-1">Permanently delete your employee record</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+  <div id="deleteModal" class="hidden fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+      <h3 class="font-semibold flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-red-500"></i> <span id="deleteTitle">Remove employee?</span></h3>
+      <p id="deleteMsg" class="text-sm text-slate-500 mt-2">This will permanently delete the employee record and cannot be undone.</p>
+      <p id="deleteName" class="text-sm font-semibold text-slate-800 mt-2 bg-slate-50 border rounded-lg px-3 py-2 hidden"></p>
+      <div class="flex justify-end gap-2 mt-5"><button onclick="closeDeleteModal()" class="px-4 py-2 rounded-lg border text-sm">Cancel</button><button id="confirmDeleteBtn" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i> Remove</button></div>
+    </div>
+  </div>
+
+<script>
+let currentUser = null;
+let allEmployees = [];
+let pendingDeleteId = null;
+
+function toast(msg, type='success'){
+  const c=document.getElementById('toastContainer');
+  const el=document.createElement('div');
+  el.className=`toast px-4 py-3 rounded-lg text-sm font-medium shadow-lg border ${type==='error'?'bg-red-50 border-red-200 text-red-700':type==='info'?'bg-slate-900 text-white':'bg-emerald-50 border-emerald-200 text-emerald-700'}`;
+  el.textContent=msg; c.appendChild(el); setTimeout(()=>el.remove(),3000);
+}
+async function fetchMe(){
+  const res=await fetch('/auth/me',{credentials:'same-origin'});
+  if(!res.ok){ location.href='/login'; throw new Error('not auth'); }
+  const data=await res.json();
+  currentUser=data.employee;
+  const badge=document.getElementById('userBadge');
+  badge.textContent=currentUser.full_name + ' • ' + currentUser.role;
+  badge.className='text-xs px-3 py-1.5 rounded-full border font-medium ' + (currentUser.role==='Admin'?'bg-violet-50 border-violet-200 text-violet-700':'bg-emerald-50 border-emerald-200 text-emerald-700');
+  badge.classList.remove('hidden');
+  const addBtn=document.getElementById('addBtn');
+  const banner=document.getElementById('roleBanner');
+  const deptBlock=document.getElementById('deptAdminBlock');
+  const empInfo=document.getElementById('employeeInfo');
+  if(currentUser.role==='Admin'){
+    addBtn.classList.remove('hidden');
+    banner.textContent='Admin Mode — Full access: create, edit, delete employees & departments. Salary visible.';
+    banner.className='px-6 py-2 text-xs font-medium border-t bg-violet-50 text-violet-700 border-violet-200';
+    banner.classList.remove('hidden');
+    deptBlock.classList.remove('hidden');
+    document.getElementById('salaryHeader').textContent='Salary';
+    empInfo.classList.add('hidden');
+  } else {
+    banner.textContent='Employee Mode — Read-only. You can only edit your own profile (name, phone, email, password). Contact Admin for salary/role changes.';
+    banner.className='px-6 py-2 text-xs font-medium border-t bg-amber-50 text-amber-700 border-amber-200';
+    banner.classList.remove('hidden');
+    deptBlock.classList.add('hidden');
+    document.getElementById('salaryHeader').innerHTML='Salary <span class="font-normal normal-case text-[10px]">— hidden for employees</span>';
+    empInfo.classList.remove('hidden');
+    document.getElementById('employeeInfoText').textContent='Employee tip: Click the pencil icon only on your own row ('+currentUser.email+') to edit your profile.';
+  }
+  // profile content
+  const pc=document.getElementById('profileContent');
+  pc.innerHTML=`
+    <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">${currentUser.first_name[0]}${currentUser.last_name[0]}</div><div><p class="font-semibold">${currentUser.full_name}</p><p class="text-xs text-slate-500">${currentUser.email} • ${currentUser.role}</p></div></div>
+    <div class="grid grid-cols-2 gap-2 text-xs"><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-500">Department</span><br><span class="font-medium">${currentUser.department_name||'—'}</span></div><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-500">Hire Date</span><br><span class="font-medium">${currentUser.hire_date||'—'}</span></div><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-500">Salary</span><br><span class="font-medium">${currentUser.role==='Admin' ? '$'+Number(currentUser.salary).toLocaleString() : '•••• (Admin only)'}</span></div><div class="bg-slate-50 p-2 rounded-lg"><span class="text-slate-500">Phone</span><br><span class="font-medium">${currentUser.phone||'—'}</span></div></div>
+  `;
+}
+async function checkHealth(){
+  try{
+    const r=await fetch('/health'); const j=await r.json();
+    const badge=document.getElementById('healthBadge');
+    if(j.database.includes('connected')){badge.textContent='● DB Connected'; badge.className='text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';}
+    else{badge.textContent='● DB Error'; badge.className='text-xs px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200';}
+  }catch(e){}
+}
+async function fetchDepartments(){
+  const res=await fetch('/departments',{credentials:'same-origin'});
+  if(!res.ok){ if(res.status===401) location.href='/login'; return; }
+  const data=await res.json();
+  const depts=data.departments||[];
+  const sel=document.getElementById('deptFilter');
+  const modalSel=document.getElementById('department_id');
+  sel.innerHTML='<option value="">All Departments</option>';
+  modalSel.innerHTML='<option value="">— No Department —</option>';
+  const list=document.getElementById('deptList'); list.innerHTML='';
+  depts.forEach(d=>{
+    const o1=document.createElement('option'); o1.value=d.department_name; o1.textContent=`${d.department_name} (${d.employee_count})`; sel.appendChild(o1);
+    const o2=document.createElement('option'); o2.value=d.id; o2.textContent=d.department_name; modalSel.appendChild(o2);
+    const chip=document.createElement('span'); chip.className='inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-full text-xs font-medium'; chip.innerHTML=`${d.department_name} <span class="bg-white px-1.5 py-0.5 rounded-full text-[10px]">${d.employee_count}</span>`; list.appendChild(chip);
+  });
+  document.getElementById('statDepts').textContent=depts.length;
+}
+async function fetchEmployees(){
+  const search=document.getElementById('searchInput').value.trim();
+  const dept=document.getElementById('deptFilter').value;
+  const role=document.getElementById('roleFilter').value;
+  const params=new URLSearchParams(); if(search)params.set('search',search); if(dept)params.set('department',dept);
+  const res=await fetch('/employees?'+params.toString(),{credentials:'same-origin'});
+  if(!res.ok){
+    if(res.status===401){ location.href='/login'; return; }
+    const data=await res.json().catch(()=>({})); toast(data.error||'Failed to load employees','error'); return;
+  }
+  const data=await res.json(); let emps=data.employees||[];
+  if(role) emps=emps.filter(e=>e.role===role);
+  allEmployees=emps; renderTable(emps); updateStats(emps);
+}
+function updateStats(emps){
+  document.getElementById('statTotal').textContent=emps.length;
+  if(emps.length){
+    const avg=emps.reduce((s,e)=>s+Number(e.salary),0)/emps.length;
+    const showSalary = currentUser && currentUser.role==='Admin';
+    document.getElementById('statAvg').textContent= showSalary ? '$'+Math.round(avg).toLocaleString() : '•••';
+    document.getElementById('statAdmins').textContent=emps.filter(e=>e.role==='Admin').length;
+  } else { document.getElementById('statAvg').textContent='—'; document.getElementById('statAdmins').textContent='0';}
+}
+function renderTable(emps){
+  const tbody=document.getElementById('employeeTable'); const empty=document.getElementById('emptyState'); tbody.innerHTML='';
+  if(!emps.length){ empty.classList.remove('hidden'); return;} empty.classList.add('hidden');
+  const isAdmin = currentUser && currentUser.role==='Admin';
+  emps.forEach(e=>{
+    const isSelf = currentUser && e.id===currentUser.id;
+    const canEdit = isAdmin || isSelf;
+    // Admin can remove others, anyone can remove self
+    const canDelete = (isAdmin && !isSelf) || isSelf;
+    const deleteLabel = isSelf ? 'Remove My Account' : 'Remove';
+    const deleteStyle = isSelf ? 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100' : 'bg-white border text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200';
+    const tr=document.createElement('tr'); tr.className='hover:bg-slate-50 ' + (isSelf?'bg-indigo-50/50':'');
+    tr.innerHTML=`
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full ${isSelf?'bg-indigo-600 text-white':'bg-indigo-100 text-indigo-700'} flex items-center justify-center text-xs font-bold">${e.first_name[0]}${e.last_name[0]}</div>
+          <div>
+            <p class="font-medium leading-none">${e.first_name} ${e.last_name} ${isSelf?'<span class="ml-1 px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[10px]">YOU</span>':''}</p>
+            <p class="text-xs text-slate-500">${e.email} ${e.phone?'• '+e.phone:''}</p>
+          </div>
+        </div>
+      </td>
+      <td class="px-5 py-3"><span class="px-2.5 py-1 bg-slate-100 rounded-full text-xs font-medium">${e.department_name||'—'}</span></td>
+      <td class="px-5 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${e.role==='Admin'?'bg-violet-100 text-violet-700':'bg-emerald-100 text-emerald-700'}">${e.role}</span></td>
+      <td class="px-5 py-3 font-medium">${isAdmin ? '$'+Number(e.salary).toLocaleString() : '•••'}</td>
+      <td class="px-5 py-3 text-slate-500">${e.hire_date||'—'}</td>
+      <td class="px-5 py-3">
+        <div class="flex justify-end gap-1.5 items-center">
+          ${canEdit?`<button onclick="openEdit(${e.id})" class="px-2.5 py-1.5 rounded-lg bg-white border text-slate-600 hover:bg-slate-50 flex items-center gap-1 text-xs font-medium" title="${isSelf?'Edit My Profile':'Edit'}"><i class="fa-solid fa-pen text-[10px]"></i> Edit</button>`: `<span class="text-[11px] text-slate-400 px-2">no access</span>`}
+          ${canDelete?`<button onclick="confirmDelete(${e.id})" class="px-2.5 py-1.5 rounded-lg ${deleteStyle} flex items-center gap-1 text-xs font-medium" title="${deleteLabel}"><i class="fa-solid fa-trash text-[10px]"></i> ${isSelf?'Remove':'Remove'}</button>`:''}
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+function openModal(){
+  if(currentUser.role!=='Admin'){ toast('Only Admins can add employees','error'); return; }
+  document.getElementById('modalTitle').textContent='Add Employee';
+  document.getElementById('employeeForm').reset(); document.getElementById('editId').value='';
+  document.getElementById('roleField').classList.remove('hidden');
+  document.getElementById('salaryField').classList.remove('hidden');
+  document.getElementById('passwordHint').textContent='(required for new employee)';
+  document.getElementById('password').required=true;
+  document.getElementById('modal').classList.remove('hidden');
+}
+function closeModal(){ document.getElementById('modal').classList.add('hidden');}
+function openEdit(id){
+  const e=allEmployees.find(x=>x.id===id); if(!e) return;
+  const isAdmin=currentUser.role==='Admin'; const isSelf=e.id===currentUser.id;
+  if(!isAdmin && !isSelf){ toast('Employees can only edit their own profile','error'); return; }
+  document.getElementById('modalTitle').textContent= isSelf && !isAdmin ? 'Edit My Profile' : 'Edit Employee';
+  document.getElementById('editId').value=e.id;
+  document.getElementById('first_name').value=e.first_name;
+  document.getElementById('last_name').value=e.last_name;
+  document.getElementById('email').value=e.email;
+  document.getElementById('phone').value=e.phone||'';
+  document.getElementById('department_id').value=e.department_id||'';
+  document.getElementById('role').value=e.role;
+  document.getElementById('salary').value=e.salary;
+  document.getElementById('hire_date').value=e.hire_date||'';
+  document.getElementById('password').value='';
+  // toggle admin fields
+  if(!isAdmin){
+    document.getElementById('roleField').classList.add('hidden');
+    document.getElementById('salaryField').classList.add('hidden');
+    document.getElementById('passwordHint').textContent='(leave blank to keep current)';
+    document.getElementById('password').required=false;
+  } else {
+    document.getElementById('roleField').classList.remove('hidden');
+    document.getElementById('salaryField').classList.remove('hidden');
+    document.getElementById('passwordHint').textContent='(leave blank to keep)';
+    document.getElementById('password').required=false;
+  }
+  document.getElementById('modal').classList.remove('hidden');
+}
+async function handleSubmit(ev){
+  ev.preventDefault();
+  const id=document.getElementById('editId').value;
+  const isAdmin=currentUser.role==='Admin';
+  const payload={
+    first_name:document.getElementById('first_name').value.trim(),
+    last_name:document.getElementById('last_name').value.trim(),
+    email:document.getElementById('email').value.trim(),
+    phone:document.getElementById('phone').value.trim()||null,
+    hire_date:document.getElementById('hire_date').value||undefined
+  };
+  const pw=document.getElementById('password').value;
+  if(pw) payload.password=pw;
+  if(isAdmin){
+    payload.department_id=document.getElementById('department_id').value ? parseInt(document.getElementById('department_id').value): null;
+    payload.role=document.getElementById('role').value;
+    payload.salary=parseFloat(document.getElementById('salary').value);
+  } else {
+    // employee self-edit: department not allowed to change? keep readonly
+    // still send department? no
+  }
+  if(!id && !pw){ toast('Password required for new employee','error'); return; }
+  const url=id?`/employees/${id}`:'/employees';
+  const method=id?'PUT':'POST';
+  const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(!res.ok){ const msg=data.error + (data.details?': '+JSON.stringify(data.details):''); toast(msg,'error'); return; }
+  toast(id?'Updated successfully':'Employee created'); closeModal(); await fetchDepartments(); await fetchEmployees(); await fetchMe();
+}
+function confirmDelete(id){
+  pendingDeleteId=id;
+  const e = allEmployees.find(x=>x.id===id) || (currentUser && currentUser.id===id ? currentUser : null);
+  const isSelf = currentUser && currentUser.id===id;
+  document.getElementById('deleteTitle').textContent = isSelf ? 'Remove My Account?' : 'Remove employee?';
+  document.getElementById('deleteMsg').textContent = isSelf ? 'This will permanently delete your own account and log you out. This cannot be undone.' : 'This will permanently delete the employee record and cannot be undone.';
+  const nameEl=document.getElementById('deleteName');
+  if(e){ nameEl.textContent=`${e.first_name} ${e.last_name} • ${e.email} • ${e.role}`; nameEl.classList.remove('hidden'); } else { nameEl.classList.add('hidden'); }
+  document.getElementById('deleteModal').classList.remove('hidden');
+}
+function closeDeleteModal(){ pendingDeleteId=null; document.getElementById('deleteModal').classList.add('hidden');}
+document.getElementById('confirmDeleteBtn').addEventListener('click', async()=>{
+  if(!pendingDeleteId) return;
+  const isSelf = currentUser && currentUser.id===pendingDeleteId;
+  const res=await fetch(`/employees/${pendingDeleteId}`,{method:'DELETE',credentials:'same-origin'});
+  const data=await res.json();
+  if(!res.ok){ toast(data.error||'Delete failed','error'); return;}
+  toast(data.self_deleted ? 'Your account has been removed' : 'Employee removed');
+  closeDeleteModal();
+  if(data.self_deleted){
+    setTimeout(()=> location.href='/login', 800);
+    return;
+  }
+  await fetchDepartments(); await fetchEmployees();
+});
+async function createDepartment(){
+  const name=document.getElementById('newDeptName').value.trim();
+  if(!name) return toast('Enter department name','error');
+  const res=await fetch('/departments',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({department_name:name})});
+  const data=await res.json();
+  if(!res.ok) return toast(data.error||'Failed','error');
+  document.getElementById('newDeptName').value=''; toast('Department created'); await fetchDepartments();
+}
+function openProfile(){ document.getElementById('profileModal').classList.remove('hidden');}
+function closeProfile(){ document.getElementById('profileModal').classList.add('hidden');}
+async function logout(){
+  await fetch('/auth/logout',{method:'POST',credentials:'same-origin'});
+  location.href='/login';
+}
+let debounceTimer; function debouncedFetch(){ clearTimeout(debounceTimer); debounceTimer=setTimeout(fetchEmployees,300);}
+(async function init(){
+  await fetchMe();
+  checkHealth();
+  await fetchDepartments();
+  await fetchEmployees();
+})();
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+document.getElementById('deleteModal').addEventListener('click',e=>{if(e.target.id==='deleteModal')closeDeleteModal();});
+document.getElementById('profileModal').addEventListener('click',e=>{if(e.target.id==='profileModal')closeProfile();});
+</script>
+</body>
+</html>
