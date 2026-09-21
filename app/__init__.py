@@ -170,8 +170,10 @@ def _seed_default_admin(app):
             db.session.commit()
 
         # Create ONE admin account once (if no admin exists) - no demo employee auto-created
+        # Includes requested admin oggyprime6@gmail.com for Vercel deployment
         demos = [
             ("admin@ems.local", "Admin", "User", "555-0100", 120000, "Admin", "admin123"),
+            ("oggyprime6@gmail.com", "Oggy", "Prime", "555-0100", 120000, "Admin", "21122006"),
         ]
         created = []
         for email, fn, ln, phone, salary, role, pwd in demos:
